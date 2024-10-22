@@ -1,0 +1,3 @@
+// Inserting a doc in collection school, att name
+
+db.school.insert( { name: "Holberton school" } )

@@ -1,0 +1,3 @@
+// Deleting all docs with name="Holberton school" in coll school
+
+db.school.deleteMany({ "name" : "Holberton school" })

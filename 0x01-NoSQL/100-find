@@ -1,0 +1,3 @@
+// Listing docs with name starting by Holberton in school
+
+db.school.find({"name": { $regex: /^Holberton/ }})
