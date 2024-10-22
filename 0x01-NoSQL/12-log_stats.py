@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
+"""returning Nginx logs stats"""
+import pymongo
 
-from pymongo import MongoClient
 
-client = MongoClient()
-db = client.logs
-collection = db.nginx
+def collection(db: dict) -> int:
+    """retrieving log info"""
+    client = pymongo.MongoClient('mongodb://127.0.0.1:27017')
+    logs = client.logs.nginx
+    return logs.count_documents(db)
 
-log_count = collection.count_documents({})
-print(f"{log_count} logs")
 
-methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
-print("Methods:")
-for method in methods:
-    method_count = collection.count_documents({"method": method})
-    print(f"\tmethod {method}: {method_count}")
+def main():
+    """Returning stats"""
 
-status_check_count = collection.count_documents({"method": "GET", "path": "/status"})
-print(f"{status_check_count} status check")
+    print(f"{collection({})} logs")
+    print("Methods:")
+    print(f"\tmethod GET: {collection({'method': 'GET'})}")
+    print(f"\tmethod POST: {collection({'method': 'POST'})}")
+    print(f"\tmethod PUT: {collection({'method': 'PUT'})}")
+    print(f"\tmethod PATCH: {collection({'method': 'PATCH'})}")
+    print(f"\tmethod DELETE: {collection({'method': 'DELETE'})}")
+    print(f"{collection({'method': 'GET', 'path': '/status'})} status check")
+
+
+if __name__ == "__main__":
+    main()
