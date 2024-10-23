@@ -1,94 +1,92 @@
 #!/usr/bin/env python3
-"""Modules"""
+""" module
+"""
 import redis
 from uuid import uuid4
-from typing import Union, Callable, Optional
 from functools import wraps
+from typing import Any, Callable, Optional, Union
 
 
 def count_calls(method: Callable) -> Callable:
-    """Returning a string from data argument"""
-    key = method.__qualname__
-
+    """ call count
+    """
     @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        """wrap functions"""
-        self._redis.incr(key)
+    def wrapper(self: Any, *args, **kwargs) -> str:
+        """ Wrapping called method
+        """
+        self._redis.incr(method.__qualname__)
         return method(self, *args, **kwargs)
     return wrapper
 
 
 def call_history(method: Callable) -> Callable:
-    """Storing history"""
+    """ call history
+    """
     @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        """Returning wrapper"""
-        input = str(args)
-        self._redis.rpush(method.__qualname__ + ":inputs", input)
-        output = str(method(self, *args, **kwargs))
-        self._redis.rpush(method.__qualname__ + ":outputs", output)
+    def wrapper(self: Any, *args) -> str:
+        """ Wraps called method.
+        """
+        self._redis.rpush(f'{method.__qualname__}:inputs', str(args))
+        output = method(self, *args)
+        self._redis.rpush(f'{method.__qualname__}:outputs', output)
         return output
     return wrapper
 
 
-def replay(fn: Callable):
-    """displaying history of calls."""
-    r = redis.Redis()
-    function_name = fn.__qualname__
-    value = r.get(function_name)
-    try:
-        value = int(value.decode("utf-8"))
-    except Exception:
-        value = 0
-
-    print("{} was called {} times:".format(function_name, value))
-    inputs = r.lrange("{}:inputs".format(function_name), 0, -1)
-
-    outputs = r.lrange("{}:outputs".format(function_name), 0, -1)
-
+def replay(fn: Callable) -> None:
+    """ Check redis history.
+    """
+    client = redis.Redis()
+    calls = client.get(fn.__qualname__).decode('utf-8')
+    inputs = [input.decode('utf-8') for input in
+              client.lrange(f'{fn.__qualname__}:inputs', 0, -1)]
+    outputs = [output.decode('utf-8') for output in
+               client.lrange(f'{fn.__qualname__}:outputs', 0, -1)]
+    print(f'{fn.__qualname__} was called {calls} times:')
     for input, output in zip(inputs, outputs):
-        try:
-            input = input.decode("utf-8")
-        except Exception:
-            input = ""
+        print(f'{fn.__qualname__}(*{input}) -> {output}')
 
-        try:
-            output = output.decode("utf-8")
-        except Exception:
-            output = ""
-        print("{}(*{}) -> {}".format(function_name, input, output))
 
 class Cache:
-    """Cache redis class"""
-    def __init__(self):
-        self._redis = redis.Redis(host='localhost', port=6379, db=0)
+    """ Cache.
+    """
+    def __init__(self) -> None:
+        """ Initializing cache obj.
+        """
+        self._redis = redis.Redis()
         self._redis.flushdb()
 
     @call_history
     @count_calls
-    def store(self, data: Union[str, bytes, int, float]) -> str:
-        """Returning string"""
-        rkey = str(uuid4())
-        self._redis.set(rkey, data)
-        return rkey
+    def store(self, data: Union[str, bytes,  int,  float]) -> str:
+        """ Stores data.
+        """
+        key = str(uuid4())
+        client = self._redis
+        client.set(key, data)
+        return key
 
-    def get(self, key: str,
-            fn: Optional[Callable] = None) -> Union[str, bytes, int, float]:
-        value = self._redis.get(key)
-        if fn:
-            value = fn(value)
+    def get(self, key: str, fn: Optional[Callable] = None) -> Any:
+        """ converting value from redis
+        """
+        client = self._redis
+        value = client.get(key)
+        if not value:
+            return
+        if fn is int:
+            return self.get_int(value)
+        if fn is str:
+            return self.get_str(value)
+        if callable(fn):
+            return fn(value)
         return value
 
-    def get_str(self, key: str) -> str:
-        """Function get string"""
-        value = self._redis.get(key)
-        return value.decode("utf-8")
+    def get_str(self, data: bytes) -> str:
+        """ bytes to string.
+        """
+        return data.decode('utf-8')
 
-    def get_int(self, key: str) -> int:
-        """get integer"""
-        value = self._redis.get(key)
-        try:
-            value = int(value.decode("utf-8"))
-        except Exception:
-            value = 0
-        return value
+    def get_int(self, data: bytes) -> int:
+        """ Converting bytes to return integer
+        """
+        return int(data)
