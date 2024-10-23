@@ -10,26 +10,26 @@ from typing import Callable
 redis_store = redis.Redis()
 
 
-def data_cacher(method: Callable) -> Callable:
-    '''Cache
-    '''
-    @wraps(method)
-    def invoker(url) -> str:
-        '''wrapper function
-        '''
-        redis_store.incr(f'count:{url}')
-        result = redis_store.get(f'result:{url}')
-        if result:
-            return result.decode('utf-8')
-        result = method(url)
-        redis_store.set(f'count:{url}', 0)
-        redis_store.setex(f'result:{url}', 10, result)
+def wrap_requests(fn: Callable) -> Callable:
+    """ wrapper """
+
+    @wraps(fn)
+    def wrapper(url):
+        """ Wrapper"""
+        redis.incr(f"count:{url}")
+        cached_response = redis.get(f"cached:{url}")
+        if cached_response:
+            return cached_response.decode('utf-8')
+        result = fn(url)
+        redis.setex(f"cached:{url}", 10, result)
         return result
-    return invoker
+
+    return wrapper
 
 
-@data_cacher
+@wrap_requests
 def get_page(url: str) -> str:
-    '''URL content
-    '''
-    return requests.get(url).text
+    """url content
+    """
+    response = requests.get(url)
+    return response.text
