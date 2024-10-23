@@ -1,37 +1,35 @@
 #!/usr/bin/env python3
-"""Module"""
-import redis
+"""
+Module
+"""
 import requests
+import redis
 from functools import wraps
 
-data = redis.Redis()
+store = redis.Redis()
 
 
-def cached_content_fun(method):
-    """html content"""
-
+def count_url_access(method):
+    """ Url access count"""
     @wraps(method)
-    def wrapper(url: str):
-        cached_content = data.get(f"cached:{url}")
-        if cached_content:
-            return cached_content.decode('utf-8')
+    def wrapper(url):
+        cached_key = "cached:" + url
+        cached_data = store.get(cached_key)
+        if cached_data:
+            return cached_data.decode("utf-8")
 
-        content = method(url)
-        data.setex(f"cached:{url}", 10, content)
-        return content
+        count_key = "count:" + url
+        html = method(url)
 
+        store.incr(count_key)
+        store.set(cached_key, html)
+        store.expire(cached_key, 10)
+        return html
     return wrapper
 
 
-@cached_content_fun
+@count_url_access
 def get_page(url: str) -> str:
-    """number of times url access occured"""
-
-    count = data.incr(f"count:{url}")
-    content = requests.get(url).text
-    return content
-
-
-# if __name__ == "__main__":
-    # get_page('http://slowwly.robertomurray.co.uk')
-    # get_page('http://google.com')
+    """ url """
+    res = requests.get(url)
+    return res.text
