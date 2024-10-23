@@ -14,14 +14,15 @@ def wrap_requests(fn: Callable) -> Callable:
     """ wrapper """
 
     @wraps(fn)
-    def wrapper(url):
+    def wrapper(url: str) -> str:
         """ Wrapper"""
-        redis.incr(f"count:{url}")
-        cached_response = redis.get(f"cached:{url}")
+        redis_store.incr(f"count:{url}")
+        cached_response = redis_store.get(f"cached:{url}")
         if cached_response:
             return cached_response.decode('utf-8')
+
         result = fn(url)
-        redis.setex(f"cached:{url}", 10, result)
+        redis_store.setex(f"cached:{url}", 10, result)
         return result
 
     return wrapper
@@ -33,3 +34,8 @@ def get_page(url: str) -> str:
     """
     response = requests.get(url)
     return response.text
+
+
+if __name__ == "__main__":
+    url = "http://slowwly.robertomurray.co.uk"
+    print(get_page(url))
