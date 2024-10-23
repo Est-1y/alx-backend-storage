@@ -1,35 +1,29 @@
 #!/usr/bin/env python3
-"""
-module
-"""
-import requests
 import redis
+import requests
 from functools import wraps
+from typing import Callable
 
-store = redis.Redis()
+redis_store = redis.Redis()
 
+def wrap_requests(fn: Callable) -> Callable:
+    """cache requests."""
 
-def count_url_access(method):
-    """url access count"""
-    @wraps(method)
+    @wraps(fn)
     def wrapper(url):
-        cached_key = "cached:" + url
-        cached_data = store.get(cached_key)
-        if cached_data:
-            return cached_data.decode("utf-8")
+        """Wrapper"""
+        redis_store.incr(f"count:{url}")
+        cached_response = redis_store.get(f"cached:{url}")
+        if cached_response:
+            return cached_response.decode('utf-8')
+        result = fn(url)
+        redis_store.setex(f"cached:{url}", 10, result)
+        return result
 
-        count_key = "count:" + url
-        html = method(url)
-
-        store.incr(count_key)
-        store.set(cached_key, html)
-        store.expire(cached_key, 10)
-        return html
     return wrapper
 
-
-@count_url_access
+@wrap_requests
 def get_page(url: str) -> str:
-    """contents of a url """
-    res = requests.get(url)
-    return res.text
+    """url content"""
+    response = requests.get(url)
+    return response.text
