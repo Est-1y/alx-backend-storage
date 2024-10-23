@@ -1,41 +1,39 @@
 #!/usr/bin/env python3
-"""
-module
-"""
-import requests
+"""module"""
 import redis
+import requests
 from functools import wraps
 
-store = redis.Redis()
 
-def count_url_access(method):
-    """url access count"""
+r = redis.Redis()
+
+
+def url_access_count(method):
+    """get_page function"""
     @wraps(method)
     def wrapper(url):
-        cached_key = "cached:" + url
-        cached_data = store.get(cached_key)
-        
-        if cached_data:
-            return cached_data.decode("utf-8")
-        
-        count_key = "count:" + url
-        try:
-            html = method(url)
-            store.incr(count_key)
-            store.set(cached_key, html, ex=10)
-            return html
-        except requests.RequestException as e:
-            return f"Error fetching {url}: {e}"
-    
+        """wrapper"""
+        key = "cached:" + url
+        cached_value = r.get(key)
+        if cached_value:
+            return cached_value.decode("utf-8")
+
+        key_count = "count:" + url
+        html_content = method(url)
+
+        r.incr(key_count)
+        r.set(key, html_content, ex=10)
+        r.expire(key, 10)
+        return html_content
     return wrapper
 
-@count_url_access
+
+@url_access_count
 def get_page(url: str) -> str:
-    """url content"""
-    res = requests.get(url)
-    res.raise_for_status()
-    return res.text
+    """HTML content"""
+    results = requests.get(url)
+    return results.text
+
 
 if __name__ == "__main__":
-    url = "http://slowwly.robertomurray.co.uk"
-    print(get_page(url))
+    get_page('http://slowwly.robertomurray.co.uk')
