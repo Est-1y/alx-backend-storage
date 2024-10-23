@@ -1,34 +1,37 @@
 #!/usr/bin/env python3
-"""
-module
-"""
+"""Module"""
 import redis
 import requests
 from functools import wraps
-from typing import Callable
+
+data = redis.Redis()
 
 
-def track_get_page(fn: Callable) -> Callable:
-    """ get_page
-    """
-    @wraps(fn)
-    def wrapper(url: str) -> str:
-        """ Wrapper
-        """
-        client = redis.Redis()
-        client.incr(f'count:{url}')
-        cached_page = client.get(f'{url}')
-        if cached_page:
-            return cached_page.decode('utf-8')
-        response = fn(url)
-        client.set(f'{url}', response, 10)
-        return response
+def cached_content_fun(method):
+    """html content"""
+
+    @wraps(method)
+    def wrapper(url: str):
+        cached_content = data.get(f"cached:{url}")
+        if cached_content:
+            return cached_content.decode('utf-8')
+
+        content = method(url)
+        data.setex(f"cached:{url}", 10, content)
+        return content
+
     return wrapper
 
 
-@track_get_page
+@cached_content_fun
 def get_page(url: str) -> str:
-    """ Making a http request.
-    """
-    response = requests.get(url)
-    return response.text
+    """number of times url access occured"""
+
+    count = data.incr(f"count:{url}")
+    content = requests.get(url).text
+    return content
+
+
+# if __name__ == "__main__":
+    # get_page('http://slowwly.robertomurray.co.uk')
+    # get_page('http://google.com')
